@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "mytestcluster-bcbb"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "mytestcluster-bcbb"
+  template:
+    metadata:
+      labels:
+        app: "mytestcluster-bcbb"
+    spec:
+      containers:
+        - name: "mytestcluster-bcbb"
+          image: "mytestregistryforryan.azurecr.io/mytestcluster"
+          ports:
+          - containerPort: 80
