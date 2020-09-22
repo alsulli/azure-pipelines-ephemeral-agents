@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: mytestregistryforryan.azurecr.io
+        username: ${{ secrets.acr_mytestregistryforryan_username }}
+        password: ${{ secrets.acr_mytestregistryforryan_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/AgentImages/Basic/Ubuntu" -f  "AgentImages/Basic/Ubuntu/Dockerfile" -t mytestregistryforryan.azurecr.io/mytestcluster:${{ github.sha }}
+        docker push mytestregistryforryan.azurecr.io/mytestcluster:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_mytestcluster_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep mytestcluster82ec | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace mytestcluster82ec`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: mytestcluster82ec
+        container-registry-url: mytestregistryforryan.azurecr.io
+        container-registry-username: ${{ secrets.acr_mytestregistryforryan_username }}
+        container-registry-password: ${{ secrets.acr_mytestregistryforryan_password }}
+        secret-name: mytestclustedockerauth
+       
+    - uses: azure/k8s-deploy@v1
+      with:
+        namespace: mytestcluster82ec
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          mytestregistryforryan.azurecr.io/mytestcluster:${{ github.sha }}
+        imagepullsecrets: |
+          mytestclustedockerauth
